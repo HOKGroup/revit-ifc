@@ -738,6 +738,7 @@ namespace Revit.IFC.Export.Exporter
 
       public virtual bool ExportElement(ExporterIFC exporterIFC, Autodesk.Revit.DB.Element element, bool exportPerIFCelement)
       {
+
          if (!CanExportElement(exporterIFC, element))
          {
             if (element is RevitLinkInstance && !ExporterCacheManager.ExportOptionsCache.ExportingLink)
