@@ -29,6 +29,7 @@ using System.Windows.Controls;
 using Revit.IFC.Common.Extensions;
 using Revit.IFC.Common.Enums;
 using Revit.IFC.Common.Utility;
+using Revit.IFC.Export.Exporter;
 
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
@@ -160,6 +161,15 @@ namespace BIM.IFC.Export.UI
       {
          get { return textBoxSetupFileName.Text; }
       }
+
+      private bool m_filePerIFCelement;
+
+      public bool FilePerIFCelement
+      {
+         get { return m_filePerIFCelement; }
+        protected set { m_filePerIFCelement = value; }
+      }
+
 
       /// <summary>
       /// Restores the previous window. If no previous window found, place on the left top.
@@ -477,6 +487,7 @@ namespace BIM.IFC.Export.UI
       /// <param name="args">Event arguments that contains the event data.</param>
       private void buttonNext_Click(object sender, RoutedEventArgs args)
       {
+         Exporter.FilePerIfcElement = FilePerIFCelement;
          string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(textBoxSetupFileName.Text);
          string filePath = Path.GetDirectoryName(textBoxSetupFileName.Text);
 
@@ -833,6 +844,18 @@ namespace BIM.IFC.Export.UI
 
          // The SelectionChanged event will be activated after the Modify Config Window is closed
          currentSelectedSetup.SelectionChanged += currentSelectedSetup_SelectionChanged;
+
+         // File Per IFC element checkbox in UI should be unchecked in form load
+         FilePerIFCelement = false;
+         FilePerIFCelementCheckBox.IsChecked = FilePerIFCelement;
+
+      }
+
+      private void CheckBox_Click(object sender, RoutedEventArgs e)
+      {
+         CheckBox checkBox = sender as CheckBox;
+         FilePerIFCelement = (bool)checkBox.IsChecked;
+         
       }
    }
 }

@@ -830,4 +830,7 @@
   <data name="ResetToOriginals" xml:space="preserve">
     <value>Reset</value>
   </data>
+  <data name="ExportFilePerIFCelement" xml:space="preserve">
+    <value>File Per ifcElement</value>
+  </data>
 </root>

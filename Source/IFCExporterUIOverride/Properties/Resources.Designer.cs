@@ -646,6 +646,15 @@ namespace BIM.IFC.Export.UI.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to File Per ifcElement.
+        /// </summary>
+        public static string ExportFilePerIFCelement {
+            get {
+                return ResourceManager.GetString("ExportFilePerIFCelement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Export IFC.
         /// </summary>
         public static string ExportIFC {
