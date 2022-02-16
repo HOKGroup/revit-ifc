@@ -133,7 +133,7 @@ namespace Revit.IFC.Export.Utility
                ExporterCacheManager.PresentationLayerSetCache.AddRepresentationToLayer(ifcCADLayer, newShapeRepresentation);
             }
             else
-               exporterIFC.GetLayerNameForPresentationLayer(element, categoryId);
+               exporterIFC.RegisterShapeForPresentationLayer(element, categoryId, newShapeRepresentation);
          }
 
          return newShapeRepresentation;

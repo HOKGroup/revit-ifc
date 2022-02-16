@@ -122,89 +122,13 @@ namespace Revit.IFC.Export.Exporter
 
       //export IFC into seperate files according each element category
       public static bool FilePerIfcElement;
-      // All IfcPerElements Lists
-      List<Element> AreaSchemeList = new List<Element>();
-      List<Element> AssemblyInstanceList = new List<Element>();
-      List<Element> BeamSystemList = new List<Element>();
-      List<Element> CeilingList = new List<Element>();
-      List<Element> FloorList = new List<Element>();
-      List<Element> WallFoundationList = new List<Element>();
-      List<Element> CurveElementList = new List<Element>();
-      List<Element> CurtainList = new List<Element>();
-      List<Element> DuctInsulationList = new List<Element>();
-      List<Element> DuctLiningList = new List<Element>();
-      List<Element> ElectricalSystemList = new List<Element>();
-      List<Element> FabricAreaList = new List<Element>();
-      List<Element> FabricSheetList = new List<Element>();
-      List<Element> FaceWallList = new List<Element>();
-      List<Element> FamilyInstanceList = new List<Element>();
-      List<Element> FilledRegionList = new List<Element>();
-      List<Element> GroupList = new List<Element>();
-      List<Element> HostedSweepList = new List<Element>();
-      List<Element> PartList = new List<Element>();
-      List<Element> PipeInsulationList = new List<Element>();
-      List<Element> RailingList = new List<Element>();
-      List<Element> RampList = new List<Element>();
-      List<Element> RebarList = new List<Element>();
-      List<Element> RoofBaseList = new List<Element>();
-      List<Element> SpatialElementList = new List<Element>();
-      List<Element> StairsList = new List<Element>();
-      List<Element> TextNoteList = new List<Element>();
-      List<Element> TopographySurfaceList = new List<Element>();
-      List<Element> TrussList = new List<Element>();
-      List<Element> WallList = new List<Element>();
-      List<Element> WallSweepList = new List<Element>();
-      List<Element> ZoneList = new List<Element>();
-      List<Element> MEP_List = new List<Element>();
-      List<Element> ProxyList = new List<Element>();
+      // All IfcPerElements List
+      List<Element> allExportedEle = new List<Element>();
 
-      Dictionary<string, List<Element>> exportCatFiles = new Dictionary<string, List<Element>>();
 
 
       #region IExporterIFC Members
-      /// <summary>
-      /// Add All IFC types to list to illitrate through this list 
-      /// </summary>
-      protected void addAllIFCTypeList()
-      {
-         //Add All IfcPerElements Category Lists to exportCatFiles
 
-         exportCatFiles.Add("ifcAreaScheme", AreaSchemeList);
-         exportCatFiles.Add("ifcAssemblyInstance", AssemblyInstanceList);
-         exportCatFiles.Add("ifcBeamSystemInstance", BeamSystemList);
-         exportCatFiles.Add("ifcCeiling", CeilingList);
-         exportCatFiles.Add("ifcFloor", FloorList);
-         exportCatFiles.Add("ifcWallFoundation", WallFoundationList);
-         exportCatFiles.Add("ifcCurveElement", CurveElementList);
-         exportCatFiles.Add("ifcCurtain", CurtainList);
-         exportCatFiles.Add("ifcDuctInsulation", DuctInsulationList);
-         exportCatFiles.Add("ifcDuctLining", DuctLiningList);
-         exportCatFiles.Add("ifcElectricalSystem", ElectricalSystemList);
-         exportCatFiles.Add("ifcFabricArea", FabricAreaList);
-         exportCatFiles.Add("ifcFabricSheet", FabricSheetList);
-         exportCatFiles.Add("ifcFaceWall", FaceWallList);
-         exportCatFiles.Add("ifcFamilyInstance", FamilyInstanceList);
-         exportCatFiles.Add("ifcFilledRegion", FilledRegionList);
-         exportCatFiles.Add("ifcGroup", GroupList);
-         exportCatFiles.Add("ifcHostedSweep", HostedSweepList);
-         exportCatFiles.Add("ifcPart", PartList);
-         exportCatFiles.Add("ifcPipeInsulation", PipeInsulationList);
-         exportCatFiles.Add("ifcRailing", RailingList);
-         exportCatFiles.Add("ifcRamp", RampList);
-         exportCatFiles.Add("ifcRebar", RebarList);
-         exportCatFiles.Add("ifcRoofBase", RoofBaseList);
-         exportCatFiles.Add("ifcSpatialElement", SpatialElementList);
-         exportCatFiles.Add("ifcStairs", StairsList);
-         exportCatFiles.Add("ifcTextNote", TextNoteList);
-         exportCatFiles.Add("ifcTopographySurface", TopographySurfaceList);
-         exportCatFiles.Add("ifcTruss", TrussList);
-         exportCatFiles.Add("ifcWall", WallList);
-         exportCatFiles.Add("ifcWallSweep", WallSweepList);
-         exportCatFiles.Add("ifcZone", ZoneList);
-         exportCatFiles.Add("ifcMEP", MEP_List);
-         exportCatFiles.Add("ifcProxy", ProxyList);
-
-      }
 
       /// <summary>
       /// Create the list of element export routines.  Each routine will export a subset of Revit elements,
@@ -273,33 +197,29 @@ namespace Revit.IFC.Export.Exporter
                InitializeElementExporters();
                if (m_ElementExporter != null)
                   m_ElementExporter(exporterIFC, document, FilePerIfcElement);
-               addAllIFCTypeList();
+
                EndExport(exporterIFC, document);
                ExporterCacheManager.Clear();
                ExporterStateManager.Clear();
-               foreach (var elementCat in exportCatFiles)
+               int counter = 1;
+               foreach (var element in allExportedEle)
                {
+                  BeginExport(exporterIFC, document, filterView);
+                  bool exported = ExportElement(exporterIFC, element, false);
 
-
-                  List<Element> currentIFCtype = elementCat.Value;
-                  if (currentIFCtype.Count > 0)
-                  {
-                     foreach (var element in currentIFCtype)
-                     {
-                        BeginExport(exporterIFC, document, filterView);
-                        bool exported = ExportElement(exporterIFC, element, false);
-
-                        EndExport(exporterIFC, document);
-                        if (exported)
-                           WriteIFCFile(exporterIFC, document, FilePerIfcElement, element);
-                        ExporterCacheManager.Clear();
-                        ExporterStateManager.Clear();
-                     }
-
-
-                  }
-
+                  EndExport(exporterIFC, document);
+                  if (exported)
+                     WriteIFCFile(exporterIFC, document, FilePerIfcElement, element);
+                  statusBar.Set(string.Format("Writring IFC File of element {0} of {1}..", counter, allExportedEle.Count));
+                  ExporterCacheManager.Clear();
+                  ExporterStateManager.Clear();
+                  counter++;
                }
+
+               // Display the message to the user when the IFC Files has been completely exported 
+               statusBar.Set(Resources.IFCExportComplete);
+
+
 
 
             }
@@ -321,7 +241,7 @@ namespace Revit.IFC.Export.Exporter
 
             ExporterCacheManager.Clear();
             ExporterStateManager.Clear();
-            exportCatFiles.Clear();
+            allExportedEle.Clear();
             DelegateClear();
 
             if (m_Writer != null)
@@ -738,7 +658,6 @@ namespace Revit.IFC.Export.Exporter
 
       public virtual bool ExportElement(ExporterIFC exporterIFC, Autodesk.Revit.DB.Element element, bool exportPerIFCelement)
       {
-
          if (!CanExportElement(exporterIFC, element))
          {
             if (element is RevitLinkInstance && !ExporterCacheManager.ExportOptionsCache.ExportingLink)
@@ -771,15 +690,17 @@ namespace Revit.IFC.Export.Exporter
 
                // if exportPerIFCelement == true it means that each elemnt will be add to its own categorylist, each category will be exported into seperated ifc file
                // otherwise exportPerIFCelement == false will expoet the element and related properties
-               if (!exportPerIFCelement)
+               if (exportPerIFCelement)
                {
-                  ExportElementImpl(exporterIFC, element, productWrapper, exportPerIFCelement);
-                  ExporterUtil.ExportRelatedProperties(exporterIFC, element, productWrapper);
-
+                  allExportedEle.Add(element);
                }
                else
                {
                   ExportElementImpl(exporterIFC, element, productWrapper, exportPerIFCelement);
+                  ExporterUtil.ExportRelatedProperties(exporterIFC, element, productWrapper);
+
+
+
 
                }
             }
@@ -912,310 +833,237 @@ namespace Revit.IFC.Export.Exporter
                // A long list of supported elements.  Please keep in alphabetical order by the first item in the list..
                if (element is AreaScheme)
                {
-                  if (exportPerIFCelement)
-                     AreaSchemeList.Add(element);
-                  else
-                     AreaSchemeExporter.ExportAreaScheme(exporterIFC, element as AreaScheme, productWrapper);
+
+                  AreaSchemeExporter.ExportAreaScheme(exporterIFC, element as AreaScheme, productWrapper);
                }
                else if (element is AssemblyInstance)
                {
                   AssemblyInstance assemblyInstance = element as AssemblyInstance;
-                  if (exportPerIFCelement)
-                     AssemblyInstanceList.Add(element);
-                  else
-                     AssemblyInstanceExporter.ExportAssemblyInstanceElement(exporterIFC, assemblyInstance, productWrapper);
+
+                  AssemblyInstanceExporter.ExportAssemblyInstanceElement(exporterIFC, assemblyInstance, productWrapper);
                }
                else if (element is BeamSystem)
                {
-                  if (exportPerIFCelement)
-                     BeamSystemList.Add(element);
+
+                  if (ExporterCacheManager.BeamSystemCache.Contains(element.Id))
+
+                     AssemblyInstanceExporter.ExportBeamSystem(exporterIFC, element as BeamSystem, productWrapper);
                   else
                   {
-                     if (ExporterCacheManager.BeamSystemCache.Contains(element.Id))
-
-                        AssemblyInstanceExporter.ExportBeamSystem(exporterIFC, element as BeamSystem, productWrapper);
-                     else
-                     {
-                        ExporterCacheManager.BeamSystemCache.Add(element.Id);
-                        shouldPreserveParameterCache = true;
-                     }
+                     ExporterCacheManager.BeamSystemCache.Add(element.Id);
+                     shouldPreserveParameterCache = true;
                   }
+
                }
                else if (element is Ceiling)
                {
                   Ceiling ceiling = element as Ceiling;
-                  if (exportPerIFCelement)
-                     CeilingList.Add(element);
-                  else
-                     CeilingExporter.ExportCeilingElement(exporterIFC, ceiling, ref geomElem, productWrapper);
+
+                  CeilingExporter.ExportCeilingElement(exporterIFC, ceiling, ref geomElem, productWrapper);
                }
                else if (element is CeilingAndFloor || element is Floor)
                {
                   // This covers both Floors and Building Pads.
                   CeilingAndFloor hostObject = element as CeilingAndFloor;
-                  if (exportPerIFCelement)
-                     FloorList.Add(element);
-                  else
-                     FloorExporter.ExportCeilingAndFloorElement(exporterIFC, hostObject, ref geomElem, productWrapper);
+
+                  FloorExporter.ExportCeilingAndFloorElement(exporterIFC, hostObject, ref geomElem, productWrapper);
                }
                else if (element is WallFoundation)
                {
                   WallFoundation footing = element as WallFoundation;
-                  if (exportPerIFCelement)
-                     WallFoundationList.Add(element);
-                  else
-                     FootingExporter.ExportFootingElement(exporterIFC, footing, geomElem, productWrapper);
+
+                  FootingExporter.ExportFootingElement(exporterIFC, footing, geomElem, productWrapper);
                }
                else if (element is CurveElement)
                {
                   CurveElement curveElem = element as CurveElement;
-                  if (exportPerIFCelement)
-                     CurveElementList.Add(element);
-                  else
-                     CurveElementExporter.ExportCurveElement(exporterIFC, curveElem, geomElem, productWrapper);
+
+                  CurveElementExporter.ExportCurveElement(exporterIFC, curveElem, geomElem, productWrapper);
                }
                else if (element is CurtainSystem)
                {
                   CurtainSystem curtainSystem = element as CurtainSystem;
-                  if (exportPerIFCelement)
-                     CurtainList.Add(element);
-                  else
-                     CurtainSystemExporter.ExportCurtainSystem(exporterIFC, curtainSystem, productWrapper);
+
+                  CurtainSystemExporter.ExportCurtainSystem(exporterIFC, curtainSystem, productWrapper);
                }
                else if (CurtainSystemExporter.IsLegacyCurtainElement(element))
                {
-                  if (exportPerIFCelement)
-                     CurtainList.Add(element);
-                  else
-                     CurtainSystemExporter.ExportLegacyCurtainElement(exporterIFC, element, productWrapper);
+
+                  CurtainSystemExporter.ExportLegacyCurtainElement(exporterIFC, element, productWrapper);
                }
                else if (element is DuctInsulation)
                {
                   DuctInsulation ductInsulation = element as DuctInsulation;
-                  if (exportPerIFCelement)
-                     DuctInsulationList.Add(element);
-                  else
-                     DuctInsulationExporter.ExportDuctInsulation(exporterIFC, ductInsulation, geomElem, productWrapper);
+
+                  DuctInsulationExporter.ExportDuctInsulation(exporterIFC, ductInsulation, geomElem, productWrapper);
                }
                else if (element is DuctLining)
                {
                   DuctLining ductLining = element as DuctLining;
-                  if (exportPerIFCelement)
-                     DuctLiningList.Add(element);
-                  else
-                     DuctLiningExporter.ExportDuctLining(exporterIFC, ductLining, geomElem, productWrapper);
+
+                  DuctLiningExporter.ExportDuctLining(exporterIFC, ductLining, geomElem, productWrapper);
                }
                else if (element is ElectricalSystem)
                {
-                  if (exportPerIFCelement)
-                     ElectricalSystemList.Add(element);
-                  else
-                     ExporterCacheManager.SystemsCache.AddElectricalSystem(element.Id);
+
+                  ExporterCacheManager.SystemsCache.AddElectricalSystem(element.Id);
                }
                else if (element is FabricArea)
                {
                   // We are exporting the fabric area as a group only.
-                  if (exportPerIFCelement)
-                     FabricAreaList.Add(element);
-                  else
-                     FabricSheetExporter.ExportFabricArea(exporterIFC, element, productWrapper);
+
+                  FabricSheetExporter.ExportFabricArea(exporterIFC, element, productWrapper);
                }
                else if (element is FabricSheet)
                {
                   FabricSheet fabricSheet = element as FabricSheet;
-                  if (exportPerIFCelement)
-                     FabricSheetList.Add(element);
-                  else
-                     FabricSheetExporter.ExportFabricSheet(exporterIFC, fabricSheet, geomElem, productWrapper);
+
+                  FabricSheetExporter.ExportFabricSheet(exporterIFC, fabricSheet, geomElem, productWrapper);
                }
                else if (element is FaceWall)
                {
-                  if (exportPerIFCelement)
-                     FaceWallList.Add(element);
-                  else
-                     WallExporter.ExportWall(exporterIFC, null, element, null, ref geomElem, productWrapper);
+
+                  WallExporter.ExportWall(exporterIFC, null, element, null, ref geomElem, productWrapper);
                }
                else if (element is FamilyInstance)
                {
                   FamilyInstance familyInstanceElem = element as FamilyInstance;
-                  if (exportPerIFCelement)
-                     FamilyInstanceList.Add(element);
-                  else
-                     FamilyInstanceExporter.ExportFamilyInstanceElement(exporterIFC, familyInstanceElem, ref geomElem, productWrapper);
+
+                  FamilyInstanceExporter.ExportFamilyInstanceElement(exporterIFC, familyInstanceElem, ref geomElem, productWrapper);
                }
                else if (element is FilledRegion)
                {
                   FilledRegion filledRegion = element as FilledRegion;
-                  if (exportPerIFCelement)
-                     FilledRegionList.Add(element);
-                  else
-                     FilledRegionExporter.Export(exporterIFC, filledRegion, geomElem, productWrapper);
+
+                  FilledRegionExporter.Export(exporterIFC, filledRegion, geomElem, productWrapper);
                }
                else if (element is Grid)
                {
-                  if (!exportPerIFCelement)
-                     ExporterCacheManager.GridCache.Add(element);
+
+                  ExporterCacheManager.GridCache.Add(element);
                }
                else if (element is Group)
                {
                   Group group = element as Group;
-                  if (exportPerIFCelement)
-                     GroupList.Add(element);
-                  else
-                     GroupExporter.ExportGroupElement(exporterIFC, group, productWrapper);
+
+                  GroupExporter.ExportGroupElement(exporterIFC, group, productWrapper);
                }
                else if (element is HostedSweep)
                {
                   HostedSweep hostedSweep = element as HostedSweep;
-                  if (exportPerIFCelement)
-                     HostedSweepList.Add(element);
-                  else
-                     HostedSweepExporter.Export(exporterIFC, hostedSweep, geomElem, productWrapper);
+
+                  HostedSweepExporter.Export(exporterIFC, hostedSweep, geomElem, productWrapper);
                }
                else if (element is Part)
                {
                   Part part = element as Part;
-                  if (exportPerIFCelement)
-                     PartList.Add(element);
+
+                  if (ExporterCacheManager.ExportOptionsCache.ExportPartsAsBuildingElements)
+                     PartExporter.ExportPartAsBuildingElement(exporterIFC, part, geomElem, productWrapper);
                   else
-                  {
-                     if (ExporterCacheManager.ExportOptionsCache.ExportPartsAsBuildingElements)
-                        PartExporter.ExportPartAsBuildingElement(exporterIFC, part, geomElem, productWrapper);
-                     else
-                        PartExporter.ExportStandalonePart(exporterIFC, part, geomElem, productWrapper);
-                  }
+                     PartExporter.ExportStandalonePart(exporterIFC, part, geomElem, productWrapper);
+
                }
                else if (element is PipeInsulation)
                {
                   PipeInsulation pipeInsulation = element as PipeInsulation;
-                  if (exportPerIFCelement)
-                     PipeInsulationList.Add(element);
-                  else
-                     PipeInsulationExporter.ExportPipeInsulation(exporterIFC, pipeInsulation, geomElem, productWrapper);
+
+                  PipeInsulationExporter.ExportPipeInsulation(exporterIFC, pipeInsulation, geomElem, productWrapper);
                }
                else if (element is Railing)
                {
-                  if (exportPerIFCelement)
-                     RailingList.Add(element);
+
+                  if (ExporterCacheManager.RailingCache.Contains(element.Id))
+                     RailingExporter.ExportRailingElement(exporterIFC, element as Railing, productWrapper);
                   else
                   {
-                     if (ExporterCacheManager.RailingCache.Contains(element.Id))
-                        RailingExporter.ExportRailingElement(exporterIFC, element as Railing, productWrapper);
-                     else
-                     {
-                        ExporterCacheManager.RailingCache.Add(element.Id);
-                        RailingExporter.AddSubElementsToCache(element as Railing);
-                        shouldPreserveParameterCache = true;
-                     }
+                     ExporterCacheManager.RailingCache.Add(element.Id);
+                     RailingExporter.AddSubElementsToCache(element as Railing);
+                     shouldPreserveParameterCache = true;
                   }
+
 
                }
                else if (RampExporter.IsRamp(element))
                {
-                  if (exportPerIFCelement)
-                     RampList.Add(element);
-                  else
-                     RampExporter.Export(exporterIFC, element, geomElem, productWrapper);
+
+                  RampExporter.Export(exporterIFC, element, geomElem, productWrapper);
                }
                else if (IsRebarType(element))
                {
-                  if (exportPerIFCelement)
-                     RebarList.Add(element);
-                  else
-                     RebarExporter.Export(exporterIFC, element, productWrapper);
+
+                  RebarExporter.Export(exporterIFC, element, productWrapper);
                }
                else if (element is RebarCoupler)
                {
                   RebarCoupler couplerElem = element as RebarCoupler;
-                  if (exportPerIFCelement)
-                     RebarList.Add(element);
-                  else
-                     RebarCouplerExporter.ExportCoupler(exporterIFC, couplerElem, productWrapper);
+
+                  RebarCouplerExporter.ExportCoupler(exporterIFC, couplerElem, productWrapper);
                }
                else if (element is RoofBase)
                {
                   RoofBase roofElement = element as RoofBase;
-                  if (exportPerIFCelement)
-                     RoofBaseList.Add(element);
-                  else
-                     RoofExporter.Export(exporterIFC, roofElement, ref geomElem, productWrapper);
+
+                  RoofExporter.Export(exporterIFC, roofElement, ref geomElem, productWrapper);
                }
                else if (element is SpatialElement)
                {
                   SpatialElement spatialElem = element as SpatialElement;
-                  if (exportPerIFCelement)
-                     SpatialElementList.Add(element);
-                  else
-                     SpatialElementExporter.ExportSpatialElement(exporterIFC, spatialElem, productWrapper);
+
+                  SpatialElementExporter.ExportSpatialElement(exporterIFC, spatialElem, productWrapper);
                }
                else if (IsStairs(element))
                {
-                  if (exportPerIFCelement)
-                     StairsList.Add(element);
-                  else
-                     StairsExporter.Export(exporterIFC, element, geomElem, productWrapper);
+
+                  StairsExporter.Export(exporterIFC, element, geomElem, productWrapper);
                }
                else if (element is TextNote)
                {
                   TextNote textNote = element as TextNote;
-                  if (exportPerIFCelement)
-                     TextNoteList.Add(element);
-                  else
-                     TextNoteExporter.Export(exporterIFC, textNote, productWrapper);
+
+                  TextNoteExporter.Export(exporterIFC, textNote, productWrapper);
                }
                else if (element is TopographySurface)
                {
                   TopographySurface topSurface = element as TopographySurface;
-                  if (exportPerIFCelement)
-                     TopographySurfaceList.Add(element);
-                  else
-                     SiteExporter.ExportTopographySurface(exporterIFC, topSurface, geomElem, productWrapper);
+
+                  SiteExporter.ExportTopographySurface(exporterIFC, topSurface, geomElem, productWrapper);
                }
                else if (element is Truss)
                {
-                  if (exportPerIFCelement)
-                     TrussList.Add(element);
+
+                  if (ExporterCacheManager.TrussCache.Contains(element.Id))
+                     AssemblyInstanceExporter.ExportTrussElement(exporterIFC, element as Truss, productWrapper);
                   else
                   {
-                     if (ExporterCacheManager.TrussCache.Contains(element.Id))
-                        AssemblyInstanceExporter.ExportTrussElement(exporterIFC, element as Truss, productWrapper);
-                     else
-                     {
-                        ExporterCacheManager.TrussCache.Add(element.Id);
-                        shouldPreserveParameterCache = true;
-                     }
+                     ExporterCacheManager.TrussCache.Add(element.Id);
+                     shouldPreserveParameterCache = true;
                   }
+
                }
                else if (element is Wall)
                {
                   Wall wallElem = element as Wall;
-                  if (exportPerIFCelement)
-                     WallList.Add(element);
-                  else
-                     WallExporter.Export(exporterIFC, wallElem, ref geomElem, productWrapper);
+
+                  WallExporter.Export(exporterIFC, wallElem, ref geomElem, productWrapper);
                }
                else if (element is WallSweep)
                {
                   WallSweep wallSweep = element as WallSweep;
-                  if (exportPerIFCelement)
-                     WallSweepList.Add(element);
-                  else
-                     WallSweepExporter.Export(exporterIFC, wallSweep, geomElem, productWrapper);
+
+                  WallSweepExporter.Export(exporterIFC, wallSweep, geomElem, productWrapper);
                }
                else if (element is Zone)
                {
-                  if (exportPerIFCelement)
-                     ZoneList.Add(element);
+
+                  if (ExporterCacheManager.ZoneCache.Contains(element.Id))
+                     ZoneExporter.ExportZone(exporterIFC, element as Zone, productWrapper);
                   else
                   {
-                     if (ExporterCacheManager.ZoneCache.Contains(element.Id))
-                        ZoneExporter.ExportZone(exporterIFC, element as Zone, productWrapper);
-                     else
-                     {
-                        ExporterCacheManager.ZoneCache.Add(element.Id);
-                        shouldPreserveParameterCache = true;
-                     }
+                     ExporterCacheManager.ZoneCache.Add(element.Id);
+                     shouldPreserveParameterCache = true;
                   }
+
                }
                else
                {
@@ -1235,19 +1083,15 @@ namespace Revit.IFC.Export.Exporter
                   bool exported = false;
                   if (IsMEPType(exporterIFC, element, exportType))
                   {
-                     if (exportPerIFCelement)
-                        MEP_List.Add(element);
-                     else
-                        exported = GenericMEPExporter.Export(exporterIFC, element, geomElem, exportType, ifcEnumType, productWrapper);
+
+                     exported = GenericMEPExporter.Export(exporterIFC, element, geomElem, exportType, ifcEnumType, productWrapper);
                   }
                   else if (ExportAsProxy(element, exportType))
                   {
                      // Note that we currently export FaceWalls as proxies, and that FaceWalls are HostObjects, so we need
                      // to have this check before the (element is HostObject check.
-                     if (exportPerIFCelement)
-                        ProxyList.Add(element);
-                     else
-                        exported = ProxyElementExporter.Export(exporterIFC, element, geomElem, productWrapper, exportType);
+
+                     exported = ProxyElementExporter.Export(exporterIFC, element, geomElem, productWrapper, exportType);
                   }
 
                   else if ((element is HostObject) || (element is DirectShape) || (element is FabricationPart))
@@ -1255,10 +1099,8 @@ namespace Revit.IFC.Export.Exporter
                      // This is intended to work for any element.  However, there are some hidden elements that we likely want to ignore.
                      // As such, this is currently limited to the two types of elements that we know we want to export that aren't covered above.
                      // Note the general comment that we would like to revamp this whole routine to be cleaner and simpler.
-                     if (exportPerIFCelement)
-                        AreaSchemeList.Add(element);
-                     else
-                        exported = FamilyInstanceExporter.ExportGenericToSpecificElement(exporterIFC, element, ref geomElem, exportType, ifcEnumType, productWrapper);
+
+                     exported = FamilyInstanceExporter.ExportGenericToSpecificElement(exporterIFC, element, ref geomElem, exportType, ifcEnumType, productWrapper);
 
                      if (!exported)
                         exported = (GenericElementExporter.ExportGenericElement(exporterIFC, element, geomElem, productWrapper, exportType) != null);
@@ -2446,11 +2288,23 @@ namespace Revit.IFC.Export.Exporter
             if (filePerIFCelement)
             {
                string ifcclassName = ExporterUtil.GetIFCClassNameFromExportTable(exporterIFC, element.Category.Id);
+               if (string.IsNullOrEmpty(ifcclassName)) 
+               {
+                  return;
+               }
                string ifcGUID = GUIDUtil.CreateGUID(element);
                string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(exportOptionsCache.FileName);
                string dir = Path.GetDirectoryName(exportOptionsCache.FileName);
                string newFileNamePerIFCelement = String.Format("{0}_{1}_{2}_{3}.{4}", fileNameWithoutExtension, ifcclassName, ifcGUID, element.VersionGuid, exportOptionsCache.IFCFileFormat);
-               writeOptions.FileName = Path.Combine(dir, newFileNamePerIFCelement);
+               string combinedFullFileNamePath = Path.Combine(dir, newFileNamePerIFCelement);
+               int i = 1;
+               while (File.Exists(combinedFullFileNamePath))
+               {
+                  newFileNamePerIFCelement = String.Format("{0}_{1}_{2}_{3}_{5}.{4}", fileNameWithoutExtension, ifcclassName, ifcGUID, element.VersionGuid, exportOptionsCache.IFCFileFormat , i);
+                   combinedFullFileNamePath = Path.Combine(dir, newFileNamePerIFCelement);
+                  i++;
+               }
+               writeOptions.FileName = combinedFullFileNamePath;
             }
             else
             {
@@ -2496,9 +2350,12 @@ namespace Revit.IFC.Export.Exporter
             {
                file.Write(writeOptions);
             }
+            if (!filePerIFCelement)
+            {
+               // Display the message to the user when the IFC File has been completely exported 
+               statusBar.Set(Resources.IFCExportComplete);
 
-            // Display the message to the user when the IFC File has been completely exported 
-            statusBar.Set(Resources.IFCExportComplete);
+            }
          }
       }
 
