@@ -12,7 +12,9 @@ using System.Windows;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Autodesk Inc.")]
 [assembly: AssemblyProduct("RevitIFCTools")]
-[assembly: AssemblyCopyright("Copyright ©  2012-2021")]
+[assembly: AssemblyCopyright("Copyright ©  2012-
+   
+   ")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -213,11 +213,11 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy "$(TargetPath)" "H:\Temp\IFC master\" /F /R /Y /I
-xcopy "$(TargetDir)IFC*.xsd" "H:\Temp\IFC master\" /F /R /Y /I
-xcopy "$(TargetDir)IFC*.exp" "H:\Temp\IFC master\" /F /R /Y /I
-xcopy "$(TargetDir)IFC Shared Parameters*.txt" "H:\Temp\IFC master\" /F /R /Y /I
-xcopy "$(TargetDir)IFCCertifiedEntitiesAndPSets.json" "H:\Temp\IFC master\" /F /R /Y /I
+    <PostBuildEvent>xcopy "$(TargetPath)" "D:\Temp\IFC master\" /F /R /Y /I
+xcopy "$(TargetDir)IFC*.xsd" "D:\Temp\IFC master\" /F /R /Y /I
+xcopy "$(TargetDir)IFC*.exp" "D:\Temp\IFC master\" /F /R /Y /I
+xcopy "$(TargetDir)IFC Shared Parameters*.txt" "D:\Temp\IFC master\" /F /R /Y /I
+xcopy "$(TargetDir)IFCCertifiedEntitiesAndPSets.json" "D:\Temp\IFC master\" /F /R /Y /I
 </PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

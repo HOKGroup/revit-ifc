@@ -106,7 +106,7 @@ namespace Revit.IFC.Export.Exporter
       private IFCFile m_IfcFile;
 
       // Allow a derived class to add Element exporter routines.
-      public delegate void ElementExporter(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document);
+      public delegate void ElementExporter(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement);
 
       protected ElementExporter m_ElementExporter = null;
 
@@ -120,7 +120,15 @@ namespace Revit.IFC.Export.Exporter
 
       protected QuantitiesToExport m_QuantitiesToExport = null;
 
+      //export IFC into seperate files according each element category
+      public static bool FilePerIfcElement;
+      // All IfcPerElements List
+      List<Element> allExportedEle = new List<Element>();
+
+
+
       #region IExporterIFC Members
+
 
       /// <summary>
       /// Create the list of element export routines.  Each routine will export a subset of Revit elements,
@@ -129,6 +137,9 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       protected virtual void InitializeElementExporters()
       {
+
+
+
          // Allow another function to potentially add exporters before ExportSpatialElements.
          if (m_ElementExporter == null)
             m_ElementExporter = ExportSpatialElements;
@@ -142,6 +153,7 @@ namespace Revit.IFC.Export.Exporter
          m_ElementExporter += ExportAdvanceSteelElements;
       }
 
+
       /// <summary>
       /// Implements the method that Autodesk Revit will invoke to perform an export to IFC.
       /// </summary>
@@ -152,21 +164,66 @@ namespace Revit.IFC.Export.Exporter
       /// are visible or not. That allows us to, e.g., choose a plan view but get 3D geometry.</remarks>
       public void ExportIFC(Autodesk.Revit.DB.Document document, ExporterIFC exporterIFC, Autodesk.Revit.DB.View filterView)
       {
+
          // Make sure our static caches are clear at the start, and end, of export.
          ExporterCacheManager.Clear();
          ExporterStateManager.Clear();
 
          try
          {
-            BeginExport(exporterIFC, document, filterView);
 
-            ParamExprListener.ResetParamExprInternalDicts();
-            InitializeElementExporters();
-            if (m_ElementExporter != null)
-               m_ElementExporter(exporterIFC, document);
 
-            EndExport(exporterIFC, document);
-            WriteIFCFile(exporterIFC, document);
+            //check to Export IFC into Sperated Files by IFC Elment Types or not
+            if (!FilePerIfcElement)
+            {
+               BeginExport(exporterIFC, document, filterView);
+
+               ParamExprListener.ResetParamExprInternalDicts();
+               InitializeElementExporters();
+               if (m_ElementExporter != null)
+                  m_ElementExporter(exporterIFC, document, FilePerIfcElement);
+
+               EndExport(exporterIFC, document);
+               WriteIFCFile(exporterIFC, document, false);
+
+
+            }
+            //Export IFC elements into seperated files 
+            else
+            {
+               BeginExport(exporterIFC, document, filterView);
+
+               ParamExprListener.ResetParamExprInternalDicts();
+               InitializeElementExporters();
+               if (m_ElementExporter != null)
+                  m_ElementExporter(exporterIFC, document, FilePerIfcElement);
+
+               EndExport(exporterIFC, document);
+               ExporterCacheManager.Clear();
+               ExporterStateManager.Clear();
+               int counter = 1;
+               foreach (var element in allExportedEle)
+               {
+                  BeginExport(exporterIFC, document, filterView);
+                  bool exported = ExportElement(exporterIFC, element, false);
+
+                  EndExport(exporterIFC, document);
+                  if (exported)
+                     WriteIFCFile(exporterIFC, document, FilePerIfcElement, element);
+                  statusBar.Set(string.Format("Writring IFC File of element {0} of {1}..", counter, allExportedEle.Count));
+                  ExporterCacheManager.Clear();
+                  ExporterStateManager.Clear();
+                  counter++;
+               }
+
+               // Display the message to the user when the IFC Files has been completely exported 
+               statusBar.Set(Resources.IFCExportComplete);
+
+
+
+
+            }
+
          }
          catch (Exception ex)
          {
@@ -184,7 +241,7 @@ namespace Revit.IFC.Export.Exporter
 
             ExporterCacheManager.Clear();
             ExporterStateManager.Clear();
-
+            allExportedEle.Clear();
             DelegateClear();
 
             if (m_Writer != null)
@@ -231,7 +288,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="exporterIFC">The exporterIFC class.</param>
       /// <param name="document">The Revit document.</param>
-      protected void ExportAdvanceSteelElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportAdvanceSteelElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          // verify if Steel elements should be exported
          if (ExporterCacheManager.ExportOptionsCache.IncludeSteelElements)
@@ -300,7 +357,7 @@ namespace Revit.IFC.Export.Exporter
             LocationPoint locationPoint = element.Location as LocationPoint;
             if (locationPoint == null)
                return false;
-          
+
             elementBBox = new BoundingBoxXYZ();
             elementBBox.set_Bounds(0, locationPoint.Point);
             elementBBox.set_Bounds(1, locationPoint.Point);
@@ -309,7 +366,7 @@ namespace Revit.IFC.Export.Exporter
          return GeometryUtil.BoundingBoxesOverlap(elementBBox, sectionBox);
       }
 
-      protected void ExportSpatialElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportSpatialElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          // Create IfcSite first here using the first visible TopographySurface if any, if not create a default one.
          // Site and Building need to be created first to ensure containment override to work
@@ -325,7 +382,7 @@ namespace Revit.IFC.Export.Exporter
                // Note that the TopographySurface exporter in ExportElementImpl does nothing if the
                // element has already been processed here.
                Element topoElem = document.GetElement(topoElemId);
-               if (ExportElement(exporterIFC, topoElem))
+               if (ExportElement(exporterIFC, topoElem, exportPerIFCelement))
                   break; // Process only the first exportable one to create the IfcSite
             }
          }
@@ -391,13 +448,13 @@ namespace Revit.IFC.Export.Exporter
             // If the section box isn't active, then we export the element.
             if (!SpatialElementInSectionBox(sectionBox, element))
                continue;
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
 
          SpatialElementExporter.DestroySpatialElementGeometryCalculator();
       }
 
-      protected void ExportNonSpatialElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportNonSpatialElements(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          FilteredElementCollector otherElementCollector = GetExportElementCollector(document, true);
 
@@ -411,7 +468,7 @@ namespace Revit.IFC.Export.Exporter
          {
             statusBar.Set(String.Format(Resources.IFCProcessingNonSpatialElements, otherElementCollectorCount, numOfOtherElement, element.Id));
             otherElementCollectorCount++;
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -420,16 +477,16 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportContainers(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportContainers(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          using (ExporterStateManager.ForceElementExport forceElementExport = new ExporterStateManager.ForceElementExport())
          {
-            ExportCachedRailings(exporterIFC, document);
-            ExportCachedFabricAreas(exporterIFC, document);
-            ExportTrusses(exporterIFC, document);
-            ExportBeamSystems(exporterIFC, document);
-            ExportAreaSchemes(exporterIFC, document);
-            ExportZones(exporterIFC, document);
+            ExportCachedRailings(exporterIFC, document, exportPerIFCelement);
+            ExportCachedFabricAreas(exporterIFC, document, exportPerIFCelement);
+            ExportTrusses(exporterIFC, document, exportPerIFCelement);
+            ExportBeamSystems(exporterIFC, document, exportPerIFCelement);
+            ExportAreaSchemes(exporterIFC, document, exportPerIFCelement);
+            ExportZones(exporterIFC, document, exportPerIFCelement);
          }
       }
 
@@ -440,7 +497,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportCachedRailings(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportCachedRailings(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          HashSet<ElementId> railingCollection = ExporterCacheManager.RailingCache;
          int railingIndex = 1;
@@ -450,7 +507,7 @@ namespace Revit.IFC.Export.Exporter
             statusBar.Set(String.Format(Resources.IFCProcessingRailings, railingIndex, railingCollectionCount, elementId));
             railingIndex++;
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -460,7 +517,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportCachedFabricAreas(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportCachedFabricAreas(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          IDictionary<ElementId, HashSet<IFCAnyHandle>> fabricAreaCollection = ExporterCacheManager.FabricAreaHandleCache;
          int fabricAreaIndex = 1;
@@ -470,7 +527,7 @@ namespace Revit.IFC.Export.Exporter
             statusBar.Set(String.Format(Resources.IFCProcessingFabricAreas, fabricAreaIndex, fabricAreaCollectionCount, elementId));
             fabricAreaIndex++;
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -479,7 +536,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportTrusses(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportTrusses(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          HashSet<ElementId> trussCollection = ExporterCacheManager.TrussCache;
          int trussIndex = 1;
@@ -489,7 +546,7 @@ namespace Revit.IFC.Export.Exporter
             statusBar.Set(String.Format(Resources.IFCProcessingTrusses, trussIndex, trussCollectionCount, elementId));
             trussIndex++;
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -498,7 +555,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportBeamSystems(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportBeamSystems(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          HashSet<ElementId> beamSystemCollection = ExporterCacheManager.BeamSystemCache;
          int beamSystemIndex = 1;
@@ -508,7 +565,7 @@ namespace Revit.IFC.Export.Exporter
             statusBar.Set(String.Format(Resources.IFCProcessingBeamSystems, beamSystemIndex, beamSystemCollectionCount, elementId));
             beamSystemIndex++;
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -517,7 +574,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportZones(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportZones(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          HashSet<ElementId> zoneCollection = ExporterCacheManager.ZoneCache;
          int zoneIndex = 1;
@@ -527,7 +584,7 @@ namespace Revit.IFC.Export.Exporter
             statusBar.Set(String.Format(Resources.IFCProcessingExportZones, zoneIndex, zoneCollectionCount, elementId));
             zoneIndex++;
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
@@ -536,22 +593,22 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="document">The Revit document.</param>
       /// <param name="exporterIFC">The exporterIFC class.</param>
-      protected void ExportAreaSchemes(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportAreaSchemes(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          foreach (ElementId elementId in ExporterCacheManager.AreaSchemeCache.Keys)
          {
             Element element = document.GetElement(elementId);
-            ExportElement(exporterIFC, element);
+            ExportElement(exporterIFC, element, exportPerIFCelement);
          }
       }
 
-      protected void ExportGrids(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportGrids(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          // Export the grids
          GridExporter.Export(exporterIFC, document);
       }
 
-      protected void ExportConnectors(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document)
+      protected void ExportConnectors(ExporterIFC exporterIFC, Autodesk.Revit.DB.Document document, bool exportPerIFCelement)
       {
          ConnectorExporter.Export(exporterIFC);
       }
@@ -594,10 +651,12 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="exporterIFC">The IFC exporter object.</param>
       /// <param name="element">The element to export.</param>
+      /// <param name="exportPerIFCelement">Determine if to export element or export each element to its own category list.</param>
       /// <returns>False if the element can't be exported at all, true otherwise.</returns>
       /// <remarks>A true return value doesn't mean something was exported, but that the
       /// routine did a quick reject on the element, or an exception occurred.</remarks>
-      public virtual bool ExportElement(ExporterIFC exporterIFC, Autodesk.Revit.DB.Element element)
+
+      public virtual bool ExportElement(ExporterIFC exporterIFC, Autodesk.Revit.DB.Element element, bool exportPerIFCelement)
       {
          if (!CanExportElement(exporterIFC, element))
          {
@@ -621,14 +680,29 @@ namespace Revit.IFC.Export.Exporter
          {
             Category category = element.Category;
             m_Writer.WriteLine(String.Format("{0},{1},{2}", element.Id, category == null ? "null" : category.Name, element.GetType().Name));
+
          }
 
          try
          {
             using (ProductWrapper productWrapper = ProductWrapper.Create(exporterIFC, true))
             {
-               ExportElementImpl(exporterIFC, element, productWrapper);
-               ExporterUtil.ExportRelatedProperties(exporterIFC, element, productWrapper);
+
+               // if exportPerIFCelement == true it means that each elemnt will be add to its own categorylist, each category will be exported into seperated ifc file
+               // otherwise exportPerIFCelement == false will expoet the element and related properties
+               if (exportPerIFCelement)
+               {
+                  allExportedEle.Add(element);
+               }
+               else
+               {
+                  ExportElementImpl(exporterIFC, element, productWrapper, exportPerIFCelement);
+                  ExporterUtil.ExportRelatedProperties(exporterIFC, element, productWrapper);
+
+
+
+
+               }
             }
 
             // We are going to clear the parameter cache for the element (not the type) after the export.
@@ -717,7 +791,7 @@ namespace Revit.IFC.Export.Exporter
       /// <param name="exporterIFC">The IFC exporter object.</param>
       /// <param name="element">The element to export.</param>
       /// <param name="productWrapper">The ProductWrapper object.</param>
-      public virtual void ExportElementImpl(ExporterIFC exporterIFC, Element element, ProductWrapper productWrapper)
+      public virtual void ExportElementImpl(ExporterIFC exporterIFC, Element element, ProductWrapper productWrapper, bool exportPerIFCelement)
       {
          Options options;
          View ownerView = null;
@@ -759,120 +833,146 @@ namespace Revit.IFC.Export.Exporter
                // A long list of supported elements.  Please keep in alphabetical order by the first item in the list..
                if (element is AreaScheme)
                {
+
                   AreaSchemeExporter.ExportAreaScheme(exporterIFC, element as AreaScheme, productWrapper);
                }
                else if (element is AssemblyInstance)
                {
                   AssemblyInstance assemblyInstance = element as AssemblyInstance;
+
                   AssemblyInstanceExporter.ExportAssemblyInstanceElement(exporterIFC, assemblyInstance, productWrapper);
                }
                else if (element is BeamSystem)
                {
+
                   if (ExporterCacheManager.BeamSystemCache.Contains(element.Id))
+
                      AssemblyInstanceExporter.ExportBeamSystem(exporterIFC, element as BeamSystem, productWrapper);
                   else
                   {
                      ExporterCacheManager.BeamSystemCache.Add(element.Id);
                      shouldPreserveParameterCache = true;
                   }
+
                }
                else if (element is Ceiling)
                {
                   Ceiling ceiling = element as Ceiling;
+
                   CeilingExporter.ExportCeilingElement(exporterIFC, ceiling, ref geomElem, productWrapper);
                }
                else if (element is CeilingAndFloor || element is Floor)
                {
                   // This covers both Floors and Building Pads.
                   CeilingAndFloor hostObject = element as CeilingAndFloor;
+
                   FloorExporter.ExportCeilingAndFloorElement(exporterIFC, hostObject, ref geomElem, productWrapper);
                }
                else if (element is WallFoundation)
                {
                   WallFoundation footing = element as WallFoundation;
+
                   FootingExporter.ExportFootingElement(exporterIFC, footing, geomElem, productWrapper);
                }
                else if (element is CurveElement)
                {
                   CurveElement curveElem = element as CurveElement;
+
                   CurveElementExporter.ExportCurveElement(exporterIFC, curveElem, geomElem, productWrapper);
                }
                else if (element is CurtainSystem)
                {
                   CurtainSystem curtainSystem = element as CurtainSystem;
+
                   CurtainSystemExporter.ExportCurtainSystem(exporterIFC, curtainSystem, productWrapper);
                }
                else if (CurtainSystemExporter.IsLegacyCurtainElement(element))
                {
+
                   CurtainSystemExporter.ExportLegacyCurtainElement(exporterIFC, element, productWrapper);
                }
                else if (element is DuctInsulation)
                {
                   DuctInsulation ductInsulation = element as DuctInsulation;
+
                   DuctInsulationExporter.ExportDuctInsulation(exporterIFC, ductInsulation, geomElem, productWrapper);
                }
                else if (element is DuctLining)
                {
                   DuctLining ductLining = element as DuctLining;
+
                   DuctLiningExporter.ExportDuctLining(exporterIFC, ductLining, geomElem, productWrapper);
                }
                else if (element is ElectricalSystem)
                {
+
                   ExporterCacheManager.SystemsCache.AddElectricalSystem(element.Id);
                }
                else if (element is FabricArea)
                {
                   // We are exporting the fabric area as a group only.
+
                   FabricSheetExporter.ExportFabricArea(exporterIFC, element, productWrapper);
                }
                else if (element is FabricSheet)
                {
                   FabricSheet fabricSheet = element as FabricSheet;
+
                   FabricSheetExporter.ExportFabricSheet(exporterIFC, fabricSheet, geomElem, productWrapper);
                }
                else if (element is FaceWall)
                {
+
                   WallExporter.ExportWall(exporterIFC, null, element, null, ref geomElem, productWrapper);
                }
                else if (element is FamilyInstance)
                {
                   FamilyInstance familyInstanceElem = element as FamilyInstance;
+
                   FamilyInstanceExporter.ExportFamilyInstanceElement(exporterIFC, familyInstanceElem, ref geomElem, productWrapper);
                }
                else if (element is FilledRegion)
                {
                   FilledRegion filledRegion = element as FilledRegion;
+
                   FilledRegionExporter.Export(exporterIFC, filledRegion, geomElem, productWrapper);
                }
                else if (element is Grid)
                {
+
                   ExporterCacheManager.GridCache.Add(element);
                }
                else if (element is Group)
                {
                   Group group = element as Group;
+
                   GroupExporter.ExportGroupElement(exporterIFC, group, productWrapper);
                }
                else if (element is HostedSweep)
                {
                   HostedSweep hostedSweep = element as HostedSweep;
+
                   HostedSweepExporter.Export(exporterIFC, hostedSweep, geomElem, productWrapper);
                }
                else if (element is Part)
                {
                   Part part = element as Part;
+
                   if (ExporterCacheManager.ExportOptionsCache.ExportPartsAsBuildingElements)
                      PartExporter.ExportPartAsBuildingElement(exporterIFC, part, geomElem, productWrapper);
                   else
                      PartExporter.ExportStandalonePart(exporterIFC, part, geomElem, productWrapper);
+
                }
                else if (element is PipeInsulation)
                {
                   PipeInsulation pipeInsulation = element as PipeInsulation;
+
                   PipeInsulationExporter.ExportPipeInsulation(exporterIFC, pipeInsulation, geomElem, productWrapper);
                }
                else if (element is Railing)
                {
+
                   if (ExporterCacheManager.RailingCache.Contains(element.Id))
                      RailingExporter.ExportRailingElement(exporterIFC, element as Railing, productWrapper);
                   else
@@ -881,46 +981,57 @@ namespace Revit.IFC.Export.Exporter
                      RailingExporter.AddSubElementsToCache(element as Railing);
                      shouldPreserveParameterCache = true;
                   }
+
+
                }
                else if (RampExporter.IsRamp(element))
                {
+
                   RampExporter.Export(exporterIFC, element, geomElem, productWrapper);
                }
                else if (IsRebarType(element))
                {
+
                   RebarExporter.Export(exporterIFC, element, productWrapper);
                }
                else if (element is RebarCoupler)
                {
                   RebarCoupler couplerElem = element as RebarCoupler;
+
                   RebarCouplerExporter.ExportCoupler(exporterIFC, couplerElem, productWrapper);
                }
                else if (element is RoofBase)
                {
                   RoofBase roofElement = element as RoofBase;
+
                   RoofExporter.Export(exporterIFC, roofElement, ref geomElem, productWrapper);
                }
                else if (element is SpatialElement)
                {
                   SpatialElement spatialElem = element as SpatialElement;
+
                   SpatialElementExporter.ExportSpatialElement(exporterIFC, spatialElem, productWrapper);
                }
                else if (IsStairs(element))
                {
+
                   StairsExporter.Export(exporterIFC, element, geomElem, productWrapper);
                }
                else if (element is TextNote)
                {
                   TextNote textNote = element as TextNote;
+
                   TextNoteExporter.Export(exporterIFC, textNote, productWrapper);
                }
                else if (element is TopographySurface)
                {
                   TopographySurface topSurface = element as TopographySurface;
+
                   SiteExporter.ExportTopographySurface(exporterIFC, topSurface, geomElem, productWrapper);
                }
                else if (element is Truss)
                {
+
                   if (ExporterCacheManager.TrussCache.Contains(element.Id))
                      AssemblyInstanceExporter.ExportTrussElement(exporterIFC, element as Truss, productWrapper);
                   else
@@ -928,19 +1039,23 @@ namespace Revit.IFC.Export.Exporter
                      ExporterCacheManager.TrussCache.Add(element.Id);
                      shouldPreserveParameterCache = true;
                   }
+
                }
                else if (element is Wall)
                {
                   Wall wallElem = element as Wall;
+
                   WallExporter.Export(exporterIFC, wallElem, ref geomElem, productWrapper);
                }
                else if (element is WallSweep)
                {
                   WallSweep wallSweep = element as WallSweep;
+
                   WallSweepExporter.Export(exporterIFC, wallSweep, geomElem, productWrapper);
                }
                else if (element is Zone)
                {
+
                   if (ExporterCacheManager.ZoneCache.Contains(element.Id))
                      ZoneExporter.ExportZone(exporterIFC, element as Zone, productWrapper);
                   else
@@ -948,6 +1063,7 @@ namespace Revit.IFC.Export.Exporter
                      ExporterCacheManager.ZoneCache.Add(element.Id);
                      shouldPreserveParameterCache = true;
                   }
+
                }
                else
                {
@@ -967,19 +1083,23 @@ namespace Revit.IFC.Export.Exporter
                   bool exported = false;
                   if (IsMEPType(exporterIFC, element, exportType))
                   {
+
                      exported = GenericMEPExporter.Export(exporterIFC, element, geomElem, exportType, ifcEnumType, productWrapper);
                   }
                   else if (ExportAsProxy(element, exportType))
                   {
                      // Note that we currently export FaceWalls as proxies, and that FaceWalls are HostObjects, so we need
                      // to have this check before the (element is HostObject check.
+
                      exported = ProxyElementExporter.Export(exporterIFC, element, geomElem, productWrapper, exportType);
                   }
+
                   else if ((element is HostObject) || (element is DirectShape) || (element is FabricationPart))
                   {
                      // This is intended to work for any element.  However, there are some hidden elements that we likely want to ignore.
                      // As such, this is currently limited to the two types of elements that we know we want to export that aren't covered above.
                      // Note the general comment that we would like to revamp this whole routine to be cleaner and simpler.
+
                      exported = FamilyInstanceExporter.ExportGenericToSpecificElement(exporterIFC, element, ref geomElem, exportType, ifcEnumType, productWrapper);
 
                      if (!exported)
@@ -2050,6 +2170,7 @@ namespace Revit.IFC.Export.Exporter
 
             // Allow native code to remove some unused handles and clear internal caches.
             ExporterIFCUtils.EndExportInternal(exporterIFC);
+
             transaction.Commit();
          }
       }
@@ -2059,7 +2180,7 @@ namespace Revit.IFC.Export.Exporter
       /// </summary>
       /// <param name="exporterIFC">The IFC exporter object.</param>
       /// <param name="document">The document to export.</param>
-      private void WriteIFCFile(ExporterIFC exporterIFC, Document document)
+      private void WriteIFCFile(ExporterIFC exporterIFC, Document document, bool filePerIFCelement, Element element = null)
       {
          ProjectInfo projectInfo = document.ProjectInformation;
          IFCFile file = exporterIFC.GetFile();
@@ -2164,7 +2285,32 @@ namespace Revit.IFC.Export.Exporter
             transaction.Commit();
 
             IFCFileWriteOptions writeOptions = new IFCFileWriteOptions();
-            writeOptions.FileName = exportOptionsCache.FileName;
+            if (filePerIFCelement)
+            {
+               string ifcclassName = ExporterUtil.GetIFCClassNameFromExportTable(exporterIFC, element.Category.Id);
+               if (string.IsNullOrEmpty(ifcclassName)) 
+               {
+                  return;
+               }
+               string ifcGUID = GUIDUtil.CreateGUID(element);
+               string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(exportOptionsCache.FileName);
+               string dir = Path.GetDirectoryName(exportOptionsCache.FileName);
+               string newFileNamePerIFCelement = String.Format("{0}_{1}_{2}_{3}.{4}", fileNameWithoutExtension, ifcclassName, ifcGUID, element.VersionGuid, exportOptionsCache.IFCFileFormat);
+               string combinedFullFileNamePath = Path.Combine(dir, newFileNamePerIFCelement);
+               int i = 1;
+               while (File.Exists(combinedFullFileNamePath))
+               {
+                  newFileNamePerIFCelement = String.Format("{0}_{1}_{2}_{3}_{5}.{4}", fileNameWithoutExtension, ifcclassName, ifcGUID, element.VersionGuid, exportOptionsCache.IFCFileFormat , i);
+                   combinedFullFileNamePath = Path.Combine(dir, newFileNamePerIFCelement);
+                  i++;
+               }
+               writeOptions.FileName = combinedFullFileNamePath;
+            }
+            else
+            {
+               writeOptions.FileName = exportOptionsCache.FileName;
+            }
+
             writeOptions.FileFormat = exportOptionsCache.IFCFileFormat;
             if (writeOptions.FileFormat == IFCFileFormat.IfcXML || writeOptions.FileFormat == IFCFileFormat.IfcXMLZIP)
             {
@@ -2204,9 +2350,12 @@ namespace Revit.IFC.Export.Exporter
             {
                file.Write(writeOptions);
             }
+            if (!filePerIFCelement)
+            {
+               // Display the message to the user when the IFC File has been completely exported 
+               statusBar.Set(Resources.IFCExportComplete);
 
-            // Display the message to the user when the IFC File has been completely exported 
-            statusBar.Set(Resources.IFCExportComplete);
+            }
          }
       }
 
@@ -3984,13 +4133,13 @@ namespace Revit.IFC.Export.Exporter
                }
                else if (crsMapUnitStr.Equals("yard", StringComparison.InvariantCultureIgnoreCase))
                {
-                  lengthScaleFactor = 1/3;
+                  lengthScaleFactor = 1 / 3;
                }
                else if (crsMapUnitStr.Equals("mile", StringComparison.InvariantCultureIgnoreCase))
                {
-                  lengthScaleFactor = 1/5280;
+                  lengthScaleFactor = 1 / 5280;
                }
-               
+
                double lengthSIScaleFactor = UnitUtils.ConvertFromInternalUnits(1.0, UnitTypeId.Meters) / lengthScaleFactor;
                IFCAnyHandle lenDims = IFCInstanceExporter.CreateDimensionalExponents(file, 1, 0, 0, 0, 0, 0, 0); // length
                IFCAnyHandle lenSIUnit = IFCInstanceExporter.CreateSIUnit(file, IFCUnit.LengthUnit, null, IFCSIUnitName.Metre);

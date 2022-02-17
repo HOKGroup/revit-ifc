@@ -365,8 +365,7 @@
     -->
   <Import Project=".\Revit.IFC.Export.props" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy "$(TargetPath)" "H:\Temp\IFC master\" /F /R /Y /I 
-xcopy "$(TargetDir)GeometryGymIFC.dll" "H:\Temp\IFC master\" /F /R /Y /I</PostBuildEvent>
+    <PostBuildEvent>copy "$(TargetPath)" "C:\ProgramData\Autodesk\ApplicationPlugins\IFC 2022.bundle\Contents\2022"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
