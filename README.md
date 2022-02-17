@@ -1,4 +1,9 @@
-# IFC for Revit and Navisworks (revit-ifc)
+# IFC for Revit and Navisworks (revit-ifc) - By Element
+
+This Fork includes this feature;
+
+![image](https://user-images.githubusercontent.com/6507154/154499540-99a9135d-8109-4864-bffd-5e90176ebe00.png)
+
 
 This is the .NET code used by Revit 2019 and Revit LT 2019 to support IFC. The open source version can override the version that comes standard with shipped Revit. This contains the source code for Link IFC, IFC export and the IFC export UI.  This also works to improve Navisworks import.
 
